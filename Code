@@ -1,0 +1,145 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Patient data structure
+typedef struct Patient {
+    int id;
+    char name[100];
+    char symptoms[100];
+    int priority;
+    char prescription_no[7];
+    struct Patient* next;
+} Patient;
+
+// Prescription counter
+static int counter = 0;
+
+// Function to generate a new prescription number
+void generate_prescription_number(char* number) {
+    sprintf(number, "MED%03d", counter++);
+}
+
+// Function to add a patient to the linked list based on triage priority
+void add_patient(Patient** head, int id, char* name, char* symptoms, int priority) {
+    Patient* new_patient = (Patient*)malloc(sizeof(Patient));
+    new_patient->id = id;
+    strcpy(new_patient->name, name);
+    strcpy(new_patient->symptoms, symptoms);
+    new_patient->priority = priority;
+    generate_prescription_number(new_patient->prescription_no);
+    new_patient->next = NULL;
+
+    // Insert based on priority
+    if (*head == NULL || (*head)->priority > priority) {
+        new_patient->next = *head;
+        *head = new_patient;
+    } else {
+        Patient* temp = *head;
+        while (temp->next != NULL && temp->next->priority <= priority) {
+            temp = temp->next;
+        }
+        new_patient->next = temp->next;
+        temp->next = new_patient;
+    }
+}
+
+// Function to display the patient list
+void display_patients(Patient* head) {
+    Patient* temp = head;
+    while (temp != NULL) {
+        printf("Patient ID: %d, Name: %s, Symptoms: %s, Priority: %d, Prescription Number: %s\n",
+            temp->id, temp->name, temp->symptoms, temp->priority, temp->prescription_no);
+        temp = temp->next;
+    }
+}
+
+// Function to triage patients based on symptoms
+int triage(char* symptoms) {
+    if (strcasestr(symptoms, "shortness of breath") != NULL || strstr(symptoms, "chest pain") != NULL) {
+        return 1;  // Red (High Priority)
+    }
+    if (strcasestr(symptoms, "minor injury") != NULL) {
+        return 3;  // Green (Low Priority)
+    }
+
+    printf("Warning: Unrecognized symptoms. Assigning medium priority (Yellow).\n");
+    return 2;  // Yellow (Medium Priority)
+}
+
+// Function to validate symptoms
+int validate_symptoms(char* symptoms) {
+    const char* valid_symptoms[] = {
+        "shortness of breath", "chest pain", "minor injury", 
+        "headache", "fever", "nausea"
+    };
+    
+    for (int i = 0; i < sizeof(valid_symptoms) / sizeof(valid_symptoms[0]); i++) {
+        if (strcasestr(symptoms, valid_symptoms[i]) != NULL) {
+            return 1; // Valid
+        }
+    }
+    
+    printf("The symptom you entered is not recognized.\n");
+    return 0; // Invalid
+}
+
+// Function to convert patient data to HL7 format
+void create_hl7_message(Patient* patient, char* hl7_message) {
+    sprintf(hl7_message, "MSH|^~\\&|HOSPITAL|ER|EMR|HOSPITAL|202503161200||ADT^A01|12345|P|2.3\n"
+                         "PID|1||%d||%s||19850505|M|||123 Main St.^^Anytown^NY^12345||(555)555-5555|||EN|S|123456789|||Emergency",
+                         patient->id, patient->name);
+}
+
+int main() {
+    Patient* head = NULL;
+    int id, priority;
+    char name[100], symptoms[100], hl7_message[500];
+    char continue_input;
+
+    do {
+        printf("\nEnter Patient ID: ");
+        scanf("%d", &id);
+        getchar(); // Clear newline after integer input
+        printf("Enter Patient Name: ");
+        fgets(name, sizeof(name), stdin);
+        name[strcspn(name, "\n")] = '\0'; // Remove newline at the end
+
+        do {
+            printf("Enter Patient Symptoms: ");
+            fgets(symptoms, sizeof(symptoms), stdin);
+            symptoms[strcspn(symptoms, "\n")] = '\0'; // Remove newline
+        } while (!validate_symptoms(symptoms)); // Repeat if invalid
+
+        // Determine triage priority
+        priority = triage(symptoms);
+
+        // Add patient to linked list
+        add_patient(&head, id, name, symptoms, priority);
+
+        // Display all patients
+        printf("\nList of Patients in ED:\n");
+        display_patients(head);
+
+        // Convert patient data to HL7 format
+        create_hl7_message(head, hl7_message);
+        printf("\nHL7 Message for Latest Patient:\n%s\n", hl7_message);
+
+        // Ask if user wants to add another patient
+        printf("Do you want to add another patient? (y/n): ");
+        scanf(" %c", &continue_input);  
+
+    } while (continue_input == 'y' || continue_input == 'Y');
+
+    // Free allocated memory
+    Patient* temp;
+    while (head != NULL) {
+        temp = head;
+        head = head->next;
+        free(temp);
+    } if (continue_input == 'n' || continue_input == 'N'){
+    printf("Your data is inputted, thanks!");
+}
+    return 0;
+}
+
